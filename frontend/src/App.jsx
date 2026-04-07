@@ -6,6 +6,7 @@ import {
   Link2,
   PlusCircle,
   Search,
+  Sparkles,
   ShieldCheck
 } from "lucide-react";
 
@@ -45,6 +46,14 @@ const moduleCards = [
     icon: ShieldCheck,
     tone: "from-violet-700/30 to-violet-500/10 border-violet-500/40"
   }
+];
+
+const quickLinks = [
+  { href: "#overview", label: "Overview" },
+  { href: "#requirements", label: "Requirements" },
+  { href: "#traceability", label: "Traceability" },
+  { href: "#changes", label: "Change Requests" },
+  { href: "#audit", label: "Audit" }
 ];
 
 const initialForm = {
@@ -341,18 +350,48 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-10 lg:px-10">
-        <header className="border-b border-white/10 pb-8">
-          <p className="text-sm uppercase tracking-[0.3em] text-blue-300">
-            Intelligent Requirement Change Impact Analyzer
-          </p>
-          <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight text-white">
-            Requirements Manager
-          </h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-300">
-            Phase 2 turns your SCM blueprint into a working source of truth for
-            requirement identification, prioritization, and lifecycle tracking.
-          </p>
+      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-8 lg:px-10">
+        <header
+          id="overview"
+          className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 lg:p-8"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.12),transparent_28%)]" />
+          <div className="relative">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-blue-200">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Intelligent Requirement Change Impact Analyzer
+                </div>
+                <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-tight text-white lg:text-5xl">
+                  Software Configuration Management, reimagined as a live MERN dashboard
+                </h1>
+                <p className="mt-5 max-w-3xl text-base leading-7 text-slate-300">
+                  Build, trace, analyze, and audit requirements in one unified workspace.
+                  This dashboard turns SCM theory into a practical demonstration of
+                  identification, change control, status accounting, and auditability.
+                </p>
+              </div>
+
+              <div className="grid min-w-[260px] gap-3 sm:grid-cols-2 lg:w-[320px] lg:grid-cols-1">
+                <HeroKpi label="Coverage" value={`${dashboardMetrics.coveragePercent}%`} />
+                <HeroKpi label="Orphans" value={stats.orphanRequirements} />
+                <HeroKpi label="Change Requests" value={changeRequestStats.total} />
+              </div>
+            </div>
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              {quickLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="rounded-full border border-white/10 bg-slate-950/50 px-4 py-2 text-sm text-slate-200 transition hover:border-blue-400/40 hover:bg-blue-500/10"
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          </div>
         </header>
 
         <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -408,15 +447,11 @@ const App = () => {
 
         <section className="mt-8 grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
           <section className="rounded-3xl border border-white/10 bg-card p-6">
-            <div className="border-b border-white/10 pb-5">
-              <h2 className="text-xl font-semibold text-white">
-                Status Accounting Dashboard
-              </h2>
-              <p className="mt-2 text-sm text-slate-300">
-                A simple SCM metrics layer showing traceability coverage,
-                lifecycle progress, and current change-control activity.
-              </p>
-            </div>
+            <SectionHeader
+              eyebrow="SCM Metrics"
+              title="Status Accounting Dashboard"
+              description="A quick operating picture of coverage, lifecycle progress, and current change-control activity."
+            />
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <MetricPanel
@@ -451,15 +486,11 @@ const App = () => {
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-card p-6">
-            <div className="border-b border-white/10 pb-5">
-              <h2 className="text-xl font-semibold text-white">
-                Audit Summary
-              </h2>
-              <p className="mt-2 text-sm text-slate-300">
-                Journal activity generated by requirement creation, traceability
-                updates, and change requests.
-              </p>
-            </div>
+            <SectionHeader
+              eyebrow="Journal Snapshot"
+              title="Audit Summary"
+              description="Live roll-up of the latest SCM events captured by the audit log."
+            />
 
             <div className="mt-6 space-y-4">
               <MiniStat
@@ -481,14 +512,17 @@ const App = () => {
           </section>
         </section>
 
-        <main className="mt-8 grid gap-8 xl:grid-cols-[1.1fr_1.6fr]">
+        <main
+          id="requirements"
+          className="mt-8 grid gap-8 xl:grid-cols-[1.1fr_1.6fr]"
+        >
           <section className="rounded-3xl border border-white/10 bg-card p-6">
-            <div className="flex items-center gap-3">
-              <PlusCircle className="h-5 w-5 text-blue-300" />
-              <h2 className="text-xl font-semibold text-white">
-                Add Requirement
-              </h2>
-            </div>
+            <SectionTitle
+              icon={PlusCircle}
+              title="Add Requirement"
+              description="Capture requirement identity, business intent, and lifecycle state in one place."
+              iconClassName="text-blue-300"
+            />
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
               <Field
@@ -669,18 +703,17 @@ const App = () => {
           </section>
         </main>
 
-        <section className="mt-8 grid gap-8 xl:grid-cols-[1fr_1.4fr]">
+        <section
+          id="traceability"
+          className="mt-8 grid gap-8 xl:grid-cols-[1fr_1.4fr]"
+        >
           <section className="rounded-3xl border border-white/10 bg-card p-6">
-            <div className="flex items-center gap-3">
-              <Link2 className="h-5 w-5 text-emerald-300" />
-              <h2 className="text-xl font-semibold text-white">
-                Create Traceability Link
-              </h2>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Connect a requirement to a code module and a test case so your RTM
-              can reveal coverage gaps and orphan items.
-            </p>
+            <SectionTitle
+              icon={Link2}
+              title="Create Traceability Link"
+              description="Connect requirements to code modules and test cases so the RTM exposes coverage strength and orphan gaps."
+              iconClassName="text-emerald-300"
+            />
 
             <form className="mt-6 space-y-4" onSubmit={handleLinkSubmit}>
               <SelectField
@@ -732,15 +765,11 @@ const App = () => {
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-card p-6">
-            <div className="border-b border-white/10 pb-5">
-              <h2 className="text-xl font-semibold text-white">
-                Traceability Matrix View
-              </h2>
-              <p className="mt-2 text-sm text-slate-300">
-                Requirements without links are marked as orphan, making SCM
-                coverage gaps easy to demonstrate.
-              </p>
-            </div>
+            <SectionHeader
+              eyebrow="RTM"
+              title="Traceability Matrix View"
+              description="Requirements without links are marked as orphan, making SCM coverage gaps immediate and visible."
+            />
 
             <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
               <div className="hidden grid-cols-[1fr_1.2fr_1.2fr_0.8fr] gap-4 bg-slate-900/80 px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 md:grid">
@@ -834,18 +863,17 @@ const App = () => {
           </section>
         </section>
 
-        <section className="mt-8 grid gap-8 xl:grid-cols-[1fr_1.4fr]">
+        <section
+          id="changes"
+          className="mt-8 grid gap-8 xl:grid-cols-[1fr_1.4fr]"
+        >
           <section className="rounded-3xl border border-white/10 bg-card p-6">
-            <div className="flex items-center gap-3">
-              <Activity className="h-5 w-5 text-amber-300" />
-              <h2 className="text-xl font-semibold text-white">
-                Raise Change Request
-              </h2>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Select a requirement, preview its blast radius, and submit a formal
-              change request with an automatically classified risk level.
-            </p>
+            <SectionTitle
+              icon={Activity}
+              title="Raise Change Request"
+              description="Preview blast radius first, then submit a formal change request with automatic risk classification."
+              iconClassName="text-amber-300"
+            />
 
             <form className="mt-6 space-y-4" onSubmit={handleChangeRequestSubmit}>
               <SelectField
@@ -914,15 +942,11 @@ const App = () => {
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-card p-6">
-            <div className="border-b border-white/10 pb-5">
-              <h2 className="text-xl font-semibold text-white">
-                Recent Change Requests
-              </h2>
-              <p className="mt-2 text-sm text-slate-300">
-                This list shows the generated impact score, risk classification,
-                and requirement context for each CR.
-              </p>
-            </div>
+            <SectionHeader
+              eyebrow="Change Control"
+              title="Recent Change Requests"
+              description="A live list of generated impact scores, risk classifications, and requirement context."
+            />
 
             <div className="mt-6 space-y-4">
               {crLoading ? (
@@ -968,16 +992,15 @@ const App = () => {
           </section>
         </section>
 
-        <section className="mt-8 rounded-3xl border border-white/10 bg-card p-6">
-          <div className="border-b border-white/10 pb-5">
-            <h2 className="text-xl font-semibold text-white">
-              Audit Timeline
-            </h2>
-            <p className="mt-2 text-sm text-slate-300">
-              This fulfills the SCM journal and status-accounting requirement by
-              showing a chronological trail of configuration activity.
-            </p>
-          </div>
+        <section
+          id="audit"
+          className="mt-8 rounded-3xl border border-white/10 bg-card p-6"
+        >
+          <SectionHeader
+            eyebrow="Governance"
+            title="Audit Timeline"
+            description="A chronological SCM journal showing how requirements, traceability, and change control evolved over time."
+          />
 
           <div className="mt-6">
             {auditLoading ? (
@@ -1037,10 +1060,42 @@ const App = () => {
 };
 
 const StatCard = ({ label, value }) => (
-  <article className="rounded-3xl border border-white/10 bg-card p-5">
+  <article className="rounded-3xl border border-white/10 bg-card p-5 shadow-lg shadow-black/10">
     <p className="text-sm text-slate-400">{label}</p>
     <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
   </article>
+);
+
+const HeroKpi = ({ label, value }) => (
+  <article className="rounded-2xl border border-white/10 bg-slate-950/55 p-4 backdrop-blur">
+    <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
+    <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+  </article>
+);
+
+const SectionHeader = ({ eyebrow, title, description }) => (
+  <div className="border-b border-white/10 pb-5">
+    <p className="text-xs uppercase tracking-[0.24em] text-slate-400">
+      {eyebrow}
+    </p>
+    <h2 className="mt-2 text-xl font-semibold text-white">{title}</h2>
+    <p className="mt-2 text-sm text-slate-300">{description}</p>
+  </div>
+);
+
+const SectionTitle = ({
+  icon: Icon,
+  title,
+  description,
+  iconClassName = "text-white"
+}) => (
+  <div>
+    <div className="flex items-center gap-3">
+      <Icon className={`h-5 w-5 ${iconClassName}`} />
+      <h2 className="text-xl font-semibold text-white">{title}</h2>
+    </div>
+    <p className="mt-3 text-sm leading-6 text-slate-300">{description}</p>
+  </div>
 );
 
 const BlastRadiusCard = ({ impactSummary }) => (
