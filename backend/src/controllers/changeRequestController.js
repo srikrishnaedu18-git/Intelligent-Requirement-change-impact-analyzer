@@ -84,3 +84,73 @@ export const createChangeRequest = async (req, res) => {
 
   res.status(201).json(populatedRequest);
 };
+
+export const updateChangeRequest = async (req, res) => {
+  const { id } = req.params;
+  const { requirement, description, proposedChange, status } = req.body;
+
+  const changeRequest = await ChangeRequest.findById(id);
+
+  if (!changeRequest) {
+    return res.status(404).json({ message: "Change request not found" });
+  }
+
+  const existingRequirement = await Requirement.findById(requirement);
+
+  if (!existingRequirement) {
+    return res.status(404).json({ message: "Requirement not found" });
+  }
+
+  const links = await TraceabilityLink.find({ requirement });
+  const impactScore =
+    10 +
+    links.filter((link) => Boolean(link.codeModule)).length * 20 +
+    (existingRequirement.priority === "High" ? 15 : 0);
+
+  changeRequest.requirement = requirement;
+  changeRequest.description = description;
+  changeRequest.proposedChange = proposedChange;
+  changeRequest.status = status;
+  changeRequest.impactScore = impactScore;
+  changeRequest.riskLevel = getRiskLevel(impactScore);
+
+  await changeRequest.save();
+
+  await createAuditLog({
+    action: "CR_UPDATED",
+    entityType: "ChangeRequest",
+    entityId: changeRequest._id.toString(),
+    details: `Change request updated for ${existingRequirement.reqId}`
+  });
+
+  const populatedRequest = await changeRequest.populate(
+    "requirement",
+    "reqId title priority status"
+  );
+
+  return res.json(populatedRequest);
+};
+
+export const deleteChangeRequest = async (req, res) => {
+  const { id } = req.params;
+
+  const changeRequest = await ChangeRequest.findById(id).populate(
+    "requirement",
+    "reqId"
+  );
+
+  if (!changeRequest) {
+    return res.status(404).json({ message: "Change request not found" });
+  }
+
+  await ChangeRequest.findByIdAndDelete(id);
+
+  await createAuditLog({
+    action: "CR_DELETED",
+    entityType: "ChangeRequest",
+    entityId: changeRequest._id.toString(),
+    details: `Change request deleted for ${changeRequest.requirement?.reqId || "requirement"}`
+  });
+
+  return res.json({ message: "Change request deleted successfully" });
+};

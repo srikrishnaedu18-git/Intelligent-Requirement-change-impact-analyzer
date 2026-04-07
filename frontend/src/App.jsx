@@ -4,10 +4,12 @@ import {
   ClipboardList,
   GitBranch,
   Link2,
+  Pencil,
   PlusCircle,
   Search,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Trash2
 } from "lucide-react";
 
 import {
@@ -15,10 +17,16 @@ import {
   createChangeRequest,
   createRequirement,
   createTraceabilityLink,
+  deleteChangeRequest,
+  deleteRequirement,
+  deleteTraceabilityLink,
   getAuditLogs,
   getChangeRequests,
   getRequirements,
-  getTraceabilityLinks
+  getTraceabilityLinks,
+  updateChangeRequest,
+  updateRequirement,
+  updateTraceabilityLink
 } from "./services/api";
 
 const moduleCards = [
@@ -74,7 +82,8 @@ const initialLinkForm = {
 const initialChangeRequestForm = {
   requirement: "",
   description: "",
-  proposedChange: ""
+  proposedChange: "",
+  status: "Pending"
 };
 
 const statusStyles = {
@@ -104,6 +113,7 @@ const App = () => {
   const [linkSubmitting, setLinkSubmitting] = useState(false);
   const [crSubmitting, setCrSubmitting] = useState(false);
   const [impactLoading, setImpactLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [linkFormData, setLinkFormData] = useState(initialLinkForm);
@@ -115,6 +125,9 @@ const App = () => {
   const [changeRequestError, setChangeRequestError] = useState("");
   const [changeRequestSuccess, setChangeRequestSuccess] = useState("");
   const [impactSummary, setImpactSummary] = useState(null);
+  const [editingRequirementId, setEditingRequirementId] = useState("");
+  const [editingLinkId, setEditingLinkId] = useState("");
+  const [editingChangeRequestId, setEditingChangeRequestId] = useState("");
 
   const loadAuditLogs = async () => {
     const auditLogData = await getAuditLogs();
@@ -265,10 +278,22 @@ const App = () => {
           .filter(Boolean)
       };
 
-      const createdRequirement = await createRequirement(payload);
-      setRequirements((current) => [createdRequirement, ...current]);
+      if (editingRequirementId) {
+        const updatedRequirement = await updateRequirement(editingRequirementId, payload);
+        setRequirements((current) =>
+          current.map((requirement) =>
+            requirement._id === editingRequirementId ? updatedRequirement : requirement
+          )
+        );
+        setSuccessMessage(`Requirement ${updatedRequirement.reqId} updated successfully.`);
+      } else {
+        const createdRequirement = await createRequirement(payload);
+        setRequirements((current) => [createdRequirement, ...current]);
+        setSuccessMessage(`Requirement ${createdRequirement.reqId} created successfully.`);
+      }
+
       setFormData(initialForm);
-      setSuccessMessage(`Requirement ${createdRequirement.reqId} created successfully.`);
+      setEditingRequirementId("");
       await loadAuditLogs();
     } catch (error) {
       setErrorMessage(error.message);
@@ -284,16 +309,29 @@ const App = () => {
     setLinkSuccessMessage("");
 
     try {
-      const createdLink = await createTraceabilityLink({
+      const payload = {
         ...linkFormData,
         coverageStatus: "Covered"
-      });
+      };
 
-      setTraceabilityLinks((current) => [createdLink, ...current]);
+      if (editingLinkId) {
+        const updatedLink = await updateTraceabilityLink(editingLinkId, payload);
+        setTraceabilityLinks((current) =>
+          current.map((link) => (link._id === editingLinkId ? updatedLink : link))
+        );
+        setLinkSuccessMessage(
+          `Traceability link updated for ${updatedLink.requirement?.reqId || "selected requirement"}.`
+        );
+      } else {
+        const createdLink = await createTraceabilityLink(payload);
+        setTraceabilityLinks((current) => [createdLink, ...current]);
+        setLinkSuccessMessage(
+          `Traceability link created for ${createdLink.requirement?.reqId || "selected requirement"}.`
+        );
+      }
+
       setLinkFormData(initialLinkForm);
-      setLinkSuccessMessage(
-        `Traceability link created for ${createdLink.requirement?.reqId || "selected requirement"}.`
-      );
+      setEditingLinkId("");
       await loadAuditLogs();
     } catch (error) {
       setLinkErrorMessage(error.message);
@@ -333,18 +371,176 @@ const App = () => {
         setImpactSummary(summary);
       }
 
-      const createdRequest = await createChangeRequest(changeRequestForm);
-      setChangeRequests((current) => [createdRequest, ...current]);
+      if (editingChangeRequestId) {
+        const updatedRequest = await updateChangeRequest(editingChangeRequestId, {
+          ...changeRequestForm,
+          status: changeRequestForm.status
+        });
+        setChangeRequests((current) =>
+          current.map((request) =>
+            request._id === editingChangeRequestId ? updatedRequest : request
+          )
+        );
+        setChangeRequestSuccess(
+          `Change request updated for ${updatedRequest.requirement?.reqId}.`
+        );
+      } else {
+        const createdRequest = await createChangeRequest(changeRequestForm);
+        setChangeRequests((current) => [createdRequest, ...current]);
+        setChangeRequestSuccess(
+          `Change request created for ${createdRequest.requirement?.reqId}.`
+        );
+      }
+
       setChangeRequestForm(initialChangeRequestForm);
       setImpactSummary(null);
-      setChangeRequestSuccess(
-        `Change request created for ${createdRequest.requirement?.reqId}.`
-      );
+      setEditingChangeRequestId("");
       await loadAuditLogs();
     } catch (error) {
       setChangeRequestError(error.message);
     } finally {
       setCrSubmitting(false);
+    }
+  };
+
+  const startRequirementEdit = (requirement) => {
+    setEditingRequirementId(requirement._id);
+    setFormData({
+      reqId: requirement.reqId,
+      title: requirement.title,
+      description: requirement.description,
+      priority: requirement.priority,
+      status: requirement.status,
+      tags: (requirement.tags || []).join(", ")
+    });
+    setErrorMessage("");
+    setSuccessMessage("");
+  };
+
+  const resetRequirementForm = () => {
+    setEditingRequirementId("");
+    setFormData(initialForm);
+    setErrorMessage("");
+    setSuccessMessage("");
+  };
+
+  const handleRequirementDelete = async (requirement) => {
+    if (!window.confirm(`Delete requirement ${requirement.reqId}?`)) {
+      return;
+    }
+
+    setDeletingId(requirement._id);
+
+    try {
+      await deleteRequirement(requirement._id);
+      setRequirements((current) =>
+        current.filter((item) => item._id !== requirement._id)
+      );
+      setTraceabilityLinks((current) =>
+        current.filter((link) => link.requirement?._id !== requirement._id)
+      );
+      setChangeRequests((current) =>
+        current.filter((request) => request.requirement?._id !== requirement._id)
+      );
+
+      if (editingRequirementId === requirement._id) {
+        resetRequirementForm();
+      }
+
+      await loadAuditLogs();
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setDeletingId("");
+    }
+  };
+
+  const startLinkEdit = (link) => {
+    setEditingLinkId(link._id);
+    setLinkFormData({
+      requirement: link.requirement?._id || "",
+      codeModule: link.codeModule,
+      testCase: link.testCase
+    });
+    setLinkErrorMessage("");
+    setLinkSuccessMessage("");
+  };
+
+  const resetLinkForm = () => {
+    setEditingLinkId("");
+    setLinkFormData(initialLinkForm);
+    setLinkErrorMessage("");
+    setLinkSuccessMessage("");
+  };
+
+  const handleLinkDelete = async (link) => {
+    if (!window.confirm("Delete this traceability link?")) {
+      return;
+    }
+
+    setDeletingId(link._id);
+
+    try {
+      await deleteTraceabilityLink(link._id);
+      setTraceabilityLinks((current) =>
+        current.filter((item) => item._id !== link._id)
+      );
+
+      if (editingLinkId === link._id) {
+        resetLinkForm();
+      }
+
+      await loadAuditLogs();
+    } catch (error) {
+      setLinkErrorMessage(error.message);
+    } finally {
+      setDeletingId("");
+    }
+  };
+
+  const startChangeRequestEdit = (request) => {
+    setEditingChangeRequestId(request._id);
+    setChangeRequestForm({
+      requirement: request.requirement?._id || "",
+      description: request.description,
+      proposedChange: request.proposedChange,
+      status: request.status || "Pending"
+    });
+    setImpactSummary(null);
+    setChangeRequestError("");
+    setChangeRequestSuccess("");
+  };
+
+  const resetChangeRequestForm = () => {
+    setEditingChangeRequestId("");
+    setChangeRequestForm(initialChangeRequestForm);
+    setImpactSummary(null);
+    setChangeRequestError("");
+    setChangeRequestSuccess("");
+  };
+
+  const handleChangeRequestDelete = async (request) => {
+    if (!window.confirm("Delete this change request?")) {
+      return;
+    }
+
+    setDeletingId(request._id);
+
+    try {
+      await deleteChangeRequest(request._id);
+      setChangeRequests((current) =>
+        current.filter((item) => item._id !== request._id)
+      );
+
+      if (editingChangeRequestId === request._id) {
+        resetChangeRequestForm();
+      }
+
+      await loadAuditLogs();
+    } catch (error) {
+      setChangeRequestError(error.message);
+    } finally {
+      setDeletingId("");
     }
   };
 
@@ -519,7 +715,7 @@ const App = () => {
           <section className="rounded-3xl border border-white/10 bg-card p-6">
             <SectionTitle
               icon={PlusCircle}
-              title="Add Requirement"
+              title={editingRequirementId ? "Edit Requirement" : "Add Requirement"}
               description="Capture requirement identity, business intent, and lifecycle state in one place."
               iconClassName="text-blue-300"
             />
@@ -584,13 +780,28 @@ const App = () => {
                 </p>
               ) : null}
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {submitting ? "Saving requirement..." : "Create Requirement"}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {submitting
+                    ? "Saving requirement..."
+                    : editingRequirementId
+                      ? "Update Requirement"
+                      : "Create Requirement"}
+                </button>
+                {editingRequirementId ? (
+                  <button
+                    type="button"
+                    onClick={resetRequirementForm}
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+              </div>
             </form>
           </section>
 
@@ -617,12 +828,13 @@ const App = () => {
             </div>
 
             <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
-              <div className="hidden grid-cols-[1fr_2fr_1fr_1fr_1.4fr] gap-4 bg-slate-900/80 px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 md:grid">
+              <div className="hidden grid-cols-[1fr_2fr_1fr_1fr_1.2fr_0.9fr] gap-4 bg-slate-900/80 px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 md:grid">
                 <span>Req ID</span>
                 <span>Title</span>
                 <span>Priority</span>
                 <span>Status</span>
                 <span>Tags</span>
+                <span>Actions</span>
               </div>
 
               {loading ? (
@@ -639,7 +851,7 @@ const App = () => {
                   {filteredRequirements.map((requirement) => (
                     <div
                       key={requirement._id}
-                      className="grid gap-3 px-5 py-4 md:grid-cols-[1fr_2fr_1fr_1fr_1.4fr] md:items-center"
+                      className="grid gap-3 px-5 py-4 md:grid-cols-[1fr_2fr_1fr_1fr_1.2fr_0.9fr] md:items-center"
                     >
                       <div>
                         <p className="text-xs uppercase tracking-[0.2em] text-slate-500 md:hidden">
@@ -695,6 +907,25 @@ const App = () => {
                           )}
                         </div>
                       </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 md:hidden">
+                          Actions
+                        </p>
+                        <div className="flex gap-2">
+                          <ActionButton
+                            icon={Pencil}
+                            label="Edit"
+                            onClick={() => startRequirementEdit(requirement)}
+                          />
+                          <ActionButton
+                            icon={Trash2}
+                            label={deletingId === requirement._id ? "Deleting..." : "Delete"}
+                            onClick={() => handleRequirementDelete(requirement)}
+                            tone="danger"
+                            disabled={deletingId === requirement._id}
+                          />
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -710,7 +941,7 @@ const App = () => {
           <section className="rounded-3xl border border-white/10 bg-card p-6">
             <SectionTitle
               icon={Link2}
-              title="Create Traceability Link"
+              title={editingLinkId ? "Edit Traceability Link" : "Create Traceability Link"}
               description="Connect requirements to code modules and test cases so the RTM exposes coverage strength and orphan gaps."
               iconClassName="text-emerald-300"
             />
@@ -754,14 +985,64 @@ const App = () => {
                 </p>
               ) : null}
 
-              <button
-                type="submit"
-                disabled={linkSubmitting || requirements.length === 0}
-                className="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {linkSubmitting ? "Saving link..." : "Create Link"}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={linkSubmitting || requirements.length === 0}
+                  className="flex-1 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {linkSubmitting
+                    ? "Saving link..."
+                    : editingLinkId
+                      ? "Update Link"
+                      : "Create Link"}
+                </button>
+                {editingLinkId ? (
+                  <button
+                    type="button"
+                    onClick={resetLinkForm}
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+              </div>
             </form>
+
+            <div className="mt-8 space-y-3 border-t border-white/10 pt-6">
+              <p className="text-sm font-semibold text-white">Manage Existing Links</p>
+              {traceabilityLinks.slice(0, 6).map((link) => (
+                <div
+                  key={link._id}
+                  className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-200">
+                        {link.requirement?.reqId} - {link.codeModule}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        Test case: {link.testCase}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <ActionButton
+                        icon={Pencil}
+                        label="Edit"
+                        onClick={() => startLinkEdit(link)}
+                      />
+                      <ActionButton
+                        icon={Trash2}
+                        label={deletingId === link._id ? "Deleting..." : "Delete"}
+                        onClick={() => handleLinkDelete(link)}
+                        tone="danger"
+                        disabled={deletingId === link._id}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-card p-6">
@@ -870,7 +1151,7 @@ const App = () => {
           <section className="rounded-3xl border border-white/10 bg-card p-6">
             <SectionTitle
               icon={Activity}
-              title="Raise Change Request"
+              title={editingChangeRequestId ? "Edit Change Request" : "Raise Change Request"}
               description="Preview blast radius first, then submit a formal change request with automatic risk classification."
               iconClassName="text-amber-300"
             />
@@ -900,6 +1181,13 @@ const App = () => {
                 placeholder="Describe the exact functional or technical change."
                 value={changeRequestForm.proposedChange}
                 onChange={handleChangeRequestChange}
+              />
+              <SelectField
+                label="Status"
+                name="status"
+                value={changeRequestForm.status}
+                onChange={handleChangeRequestChange}
+                options={["Pending", "Approved"]}
               />
 
               <button
@@ -931,13 +1219,28 @@ const App = () => {
                 </p>
               ) : null}
 
-              <button
-                type="submit"
-                disabled={crSubmitting || requirements.length === 0}
-                className="w-full rounded-2xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {crSubmitting ? "Submitting change request..." : "Submit Change Request"}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={crSubmitting || requirements.length === 0}
+                  className="flex-1 rounded-2xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {crSubmitting
+                    ? "Submitting change request..."
+                    : editingChangeRequestId
+                      ? "Update Change Request"
+                      : "Submit Change Request"}
+                </button>
+                {editingChangeRequestId ? (
+                  <button
+                    type="button"
+                    onClick={resetChangeRequestForm}
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+              </div>
             </form>
           </section>
 
@@ -980,6 +1283,18 @@ const App = () => {
                         <span className="inline-flex rounded-full bg-blue-600/20 px-3 py-1 text-xs font-semibold text-blue-200">
                           {request.status}
                         </span>
+                        <ActionButton
+                          icon={Pencil}
+                          label="Edit"
+                          onClick={() => startChangeRequestEdit(request)}
+                        />
+                        <ActionButton
+                          icon={Trash2}
+                          label={deletingId === request._id ? "Deleting..." : "Delete"}
+                          onClick={() => handleChangeRequestDelete(request)}
+                          tone="danger"
+                          disabled={deletingId === request._id}
+                        />
                       </div>
                     </div>
                     <p className="mt-3 text-sm text-slate-400">
@@ -1072,6 +1387,33 @@ const HeroKpi = ({ label, value }) => (
     <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
   </article>
 );
+
+const ActionButton = ({
+  icon: Icon,
+  label,
+  onClick,
+  tone = "default",
+  disabled = false
+}) => {
+  const tones = {
+    default: "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
+    danger: "border-rose-500/20 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${
+        tones[tone]
+      }`}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </button>
+  );
+};
 
 const SectionHeader = ({ eyebrow, title, description }) => (
   <div className="border-b border-white/10 pb-5">

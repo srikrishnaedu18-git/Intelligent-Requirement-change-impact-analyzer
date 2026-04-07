@@ -35,6 +35,26 @@ export const createRequirement = async (payload) => {
   return handleResponse(response);
 };
 
+export const updateRequirement = async (id, payload) => {
+  const response = await fetch(`${API_BASE_URL}/requirements/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  return handleResponse(response);
+};
+
+export const deleteRequirement = async (id) => {
+  const response = await fetch(`${API_BASE_URL}/requirements/${id}`, {
+    method: "DELETE"
+  });
+
+  return handleResponse(response);
+};
+
 export const getTraceabilityLinks = async () => {
   const response = await fetch(`${API_BASE_URL}/traceability-links`);
   return handleResponse(response);
@@ -47,6 +67,26 @@ export const createTraceabilityLink = async (payload) => {
       "Content-Type": "application/json"
     },
     body: JSON.stringify(payload)
+  });
+
+  return handleResponse(response);
+};
+
+export const updateTraceabilityLink = async (id, payload) => {
+  const response = await fetch(`${API_BASE_URL}/traceability-links/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  return handleResponse(response);
+};
+
+export const deleteTraceabilityLink = async (id) => {
+  const response = await fetch(`${API_BASE_URL}/traceability-links/${id}`, {
+    method: "DELETE"
   });
 
   return handleResponse(response);
@@ -71,6 +111,26 @@ export const createChangeRequest = async (payload) => {
       "Content-Type": "application/json"
     },
     body: JSON.stringify(payload)
+  });
+
+  return handleResponse(response);
+};
+
+export const updateChangeRequest = async (id, payload) => {
+  const response = await fetch(`${API_BASE_URL}/change-requests/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  return handleResponse(response);
+};
+
+export const deleteChangeRequest = async (id) => {
+  const response = await fetch(`${API_BASE_URL}/change-requests/${id}`, {
+    method: "DELETE"
   });
 
   return handleResponse(response);
