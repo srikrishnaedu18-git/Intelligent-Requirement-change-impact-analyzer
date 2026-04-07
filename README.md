@@ -145,6 +145,25 @@ npm run dev
 The frontend runs on `http://localhost:5173` and the backend runs on
 `http://localhost:5000`.
 
+## Demo Seed Data
+
+To populate the database with presentation-ready sample records:
+
+```bash
+cd backend
+npm run seed
+```
+
+This will reset and reinsert demo data for:
+
+- requirements
+- traceability links
+- change requests
+- audit log entries
+
+Use the seed before a demo if you want a consistent project state with linked
+and orphan requirements already visible.
+
 ## API Modules
 
 ### Requirements
