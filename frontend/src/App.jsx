@@ -546,7 +546,83 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-8 lg:px-10">
+      <div className="mx-auto flex min-h-screen max-w-[1600px] gap-6 px-4 py-4 lg:px-6">
+        <aside className="sticky top-4 hidden h-[calc(100vh-2rem)] w-72 shrink-0 overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/70 shadow-2xl shadow-black/20 backdrop-blur lg:flex lg:flex-col">
+          <div className="border-b border-white/10 p-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-200">
+              <Sparkles className="h-3.5 w-3.5" />
+              SCM Intelligence
+            </div>
+            <h2 className="mt-4 text-2xl font-semibold text-white">
+              Control Center
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              Navigate the full requirement lifecycle from identification to audit.
+            </p>
+          </div>
+
+          <nav className="flex-1 space-y-2 p-4">
+            {quickLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200 transition hover:border-blue-400/40 hover:bg-blue-500/10"
+              >
+                <span>{link.label}</span>
+                <span className="text-slate-500">#</span>
+              </a>
+            ))}
+          </nav>
+
+          <div className="border-t border-white/10 p-4">
+            <div className="space-y-3">
+              {moduleCards.map((module) => {
+                const Icon = module.icon;
+
+                return (
+                  <div
+                    key={module.title}
+                    className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-xl border border-white/10 bg-slate-900/80 p-2">
+                        <Icon className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-white">
+                          {module.title}
+                        </p>
+                        <p className="text-xs text-slate-400">{module.summary}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </aside>
+
+        <div className="min-w-0 flex-1">
+          <div className="sticky top-4 z-20 mb-6 rounded-[1.6rem] border border-white/10 bg-slate-950/75 px-4 py-4 shadow-xl shadow-black/20 backdrop-blur">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">
+                  Intelligent Requirement Change Impact Analyzer
+                </p>
+                <h1 className="mt-1 text-2xl font-semibold text-white">
+                  MERN SCM Dashboard
+                </h1>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <TopBarPill label="Requirements" value={stats.total} tone="blue" />
+                <TopBarPill label="Coverage" value={`${dashboardMetrics.coveragePercent}%`} tone="emerald" />
+                <TopBarPill label="Audit Entries" value={auditLogs.length} tone="violet" />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex min-h-screen flex-col">
         <header
           id="overview"
           className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 lg:p-8"
@@ -1369,6 +1445,8 @@ const App = () => {
             )}
           </div>
         </section>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1387,6 +1465,23 @@ const HeroKpi = ({ label, value }) => (
     <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
   </article>
 );
+
+const TopBarPill = ({ label, value, tone }) => {
+  const tones = {
+    blue: "border-blue-500/20 bg-blue-500/10 text-blue-100",
+    emerald: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
+    violet: "border-violet-500/20 bg-violet-500/10 text-violet-100"
+  };
+
+  return (
+    <div
+      className={`rounded-2xl border px-4 py-3 ${tones[tone] || "border-white/10 bg-white/5 text-white"}`}
+    >
+      <p className="text-[11px] uppercase tracking-[0.2em] opacity-75">{label}</p>
+      <p className="mt-1 text-lg font-semibold">{value}</p>
+    </div>
+  );
+};
 
 const ActionButton = ({
   icon: Icon,
