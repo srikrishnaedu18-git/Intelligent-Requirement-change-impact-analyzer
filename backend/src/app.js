@@ -4,6 +4,7 @@ import express from "express";
 
 import auditLogRoutes from "./routes/auditLogRoutes.js";
 import changeRequestRoutes from "./routes/changeRequestRoutes.js";
+import projectRoutes from "./routes/projectRoutes.js";
 import requirementRoutes from "./routes/requirementRoutes.js";
 import traceabilityRoutes from "./routes/traceabilityRoutes.js";
 
@@ -22,5 +23,6 @@ app.use("/api/requirements", requirementRoutes);
 app.use("/api/traceability-links", traceabilityRoutes);
 app.use("/api/change-requests", changeRequestRoutes);
 app.use("/api/audit-logs", auditLogRoutes);
+app.use("/api/projects", projectRoutes);
 
 export default app;

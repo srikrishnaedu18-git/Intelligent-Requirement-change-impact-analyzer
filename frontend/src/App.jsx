@@ -15,6 +15,7 @@ import {
 import {
   analyzeImpact,
   createChangeRequest,
+  createProject,
   createRequirement,
   createTraceabilityLink,
   deleteChangeRequest,
@@ -22,6 +23,7 @@ import {
   deleteTraceabilityLink,
   getAuditLogs,
   getChangeRequests,
+  getProjects,
   getRequirements,
   getTraceabilityLinks,
   updateChangeRequest,
@@ -93,6 +95,11 @@ const initialChangeRequestForm = {
   status: "Pending"
 };
 
+const initialProjectForm = {
+  name: "",
+  description: ""
+};
+
 const statusStyles = {
   Draft: "bg-slate-700/60 text-slate-100",
   Approved: "bg-blue-600/20 text-blue-200",
@@ -107,6 +114,10 @@ const priorityStyles = {
 
 const App = () => {
   const [formData, setFormData] = useState(initialForm);
+  const [projects, setProjects] = useState([]);
+  const [activeProjectId, setActiveProjectId] = useState("");
+  const [projectFormData, setProjectFormData] = useState(initialProjectForm);
+  const [projectSubmitting, setProjectSubmitting] = useState(false);
   const [requirements, setRequirements] = useState([]);
   const [traceabilityLinks, setTraceabilityLinks] = useState([]);
   const [changeRequests, setChangeRequests] = useState([]);
@@ -143,23 +154,47 @@ const App = () => {
   );
 
   const loadAuditLogs = async () => {
-    const auditLogData = await getAuditLogs();
+    const auditLogData = await getAuditLogs(activeProjectId);
     setAuditLogs(auditLogData);
   };
 
   useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const projectData = await getProjects();
+        setProjects(projectData);
+
+        if (!activeProjectId && projectData.length > 0) {
+          const defaultProject =
+            projectData.find((project) => project.isDefault) || projectData[0];
+          setActiveProjectId(defaultProject._id);
+        }
+      } catch (error) {
+        setErrorMessage(error.message);
+      }
+    };
+
+    loadProjects();
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    if (!activeProjectId) {
+      return;
+    }
+
     const loadDashboardData = async () => {
       try {
         setLoading(true);
         setLinksLoading(true);
         setCrLoading(true);
         setAuditLoading(true);
-        const [requirementsData, linksData, changeRequestsData, auditLogData] = await Promise.all([
-          getRequirements(),
-          getTraceabilityLinks(),
-          getChangeRequests(),
-          getAuditLogs()
-        ]);
+        const [requirementsData, linksData, changeRequestsData, auditLogData] =
+          await Promise.all([
+            getRequirements(activeProjectId),
+            getTraceabilityLinks(activeProjectId),
+            getChangeRequests(activeProjectId),
+            getAuditLogs(activeProjectId)
+          ]);
         setRequirements(requirementsData);
         setTraceabilityLinks(linksData);
         setChangeRequests(changeRequestsData);
@@ -175,7 +210,7 @@ const App = () => {
     };
 
     loadDashboardData();
-  }, []);
+  }, [activeProjectId]);
 
   const filteredRequirements = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -282,6 +317,11 @@ const App = () => {
     setFormData((current) => ({ ...current, [name]: value }));
   };
 
+  const handleProjectChange = (event) => {
+    const { name, value } = event.target;
+    setProjectFormData((current) => ({ ...current, [name]: value }));
+  };
+
   const handleLinkChange = (event) => {
     const { name, value } = event.target;
     setLinkFormData((current) => ({ ...current, [name]: value }));
@@ -301,6 +341,7 @@ const App = () => {
     try {
       const payload = {
         ...formData,
+        projectId: activeProjectId,
         tags: []
       };
 
@@ -337,6 +378,7 @@ const App = () => {
     try {
       const payload = {
         ...linkFormData,
+        projectId: activeProjectId,
         coverageStatus: "Covered"
       };
 
@@ -376,7 +418,10 @@ const App = () => {
     setChangeRequestError("");
 
     try {
-      const summary = await analyzeImpact(changeRequestForm.requirement);
+      const summary = await analyzeImpact(
+        changeRequestForm.requirement,
+        activeProjectId
+      );
       setImpactSummary(summary);
     } catch (error) {
       setChangeRequestError(error.message);
@@ -393,7 +438,10 @@ const App = () => {
 
     try {
       if (!impactSummary || impactSummary.requirement?._id !== changeRequestForm.requirement) {
-        const summary = await analyzeImpact(changeRequestForm.requirement);
+        const summary = await analyzeImpact(
+          changeRequestForm.requirement,
+          activeProjectId
+        );
         setImpactSummary(summary);
       }
 
@@ -411,7 +459,10 @@ const App = () => {
           `Change request updated for ${updatedRequest.requirement?.reqId}.`
         );
       } else {
-        const createdRequest = await createChangeRequest(changeRequestForm);
+        const createdRequest = await createChangeRequest({
+          ...changeRequestForm,
+          projectId: activeProjectId
+        });
         setChangeRequests((current) => [createdRequest, ...current]);
         setChangeRequestSuccess(
           `Change request created for ${createdRequest.requirement?.reqId}.`
@@ -539,6 +590,27 @@ const App = () => {
     }
   };
 
+  const handleProjectSubmit = async (event) => {
+    event.preventDefault();
+    setProjectSubmitting(true);
+
+    try {
+      const createdProject = await createProject(projectFormData);
+      setProjects((current) => [...current, createdProject]);
+      setActiveProjectId(createdProject._id);
+      setProjectFormData(initialProjectForm);
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setProjectSubmitting(false);
+    }
+  };
+
+  const activeProject = useMemo(
+    () => projects.find((project) => project._id === activeProjectId) || null,
+    [projects, activeProjectId]
+  );
+
   const startLinkEdit = (link) => {
     setEditingLinkId(link._id);
     setLinkFormData({
@@ -633,16 +705,67 @@ const App = () => {
       <div className="mx-auto flex min-h-screen max-w-[1600px] gap-6 px-4 py-4 lg:px-6">
         <aside className="sticky top-4 hidden h-[calc(100vh-2rem)] w-72 shrink-0 overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/70 shadow-2xl shadow-black/20 backdrop-blur lg:flex lg:flex-col">
           <div className="border-b border-white/10 p-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-200">
-              <Sparkles className="h-3.5 w-3.5" />
-              SCM Intelligence
-            </div>
+            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">
+              Projects
+            </p>
             <h2 className="mt-4 text-2xl font-semibold text-white">
-              Control Center
+              {activeProject?.name || "Project Workspace"}
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-400">
-              Navigate the full requirement lifecycle from identification to audit.
+              {activeProject?.description ||
+                "Create and switch between project-specific SCM workspaces."}
             </p>
+          </div>
+
+          <div className="border-b border-white/10 p-4">
+            <form className="space-y-3" onSubmit={handleProjectSubmit}>
+              <Field
+                label="Project Name"
+                name="name"
+                placeholder="Project Beta"
+                value={projectFormData.name}
+                onChange={handleProjectChange}
+              />
+              <TextAreaField
+                label="Description"
+                name="description"
+                placeholder="Short project summary"
+                value={projectFormData.description}
+                onChange={handleProjectChange}
+              />
+              <button
+                type="submit"
+                disabled={projectSubmitting}
+                className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {projectSubmitting ? "Creating..." : "Add Project"}
+              </button>
+            </form>
+          </div>
+
+          <div className="border-b border-white/10 p-4">
+            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-slate-400">
+              Project List
+            </p>
+            <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+              {projects.map((project) => (
+                <button
+                  key={project._id}
+                  type="button"
+                  onClick={() => setActiveProjectId(project._id)}
+                  className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                    activeProjectId === project._id
+                      ? "border-blue-400/40 bg-blue-500/10"
+                      : "border-white/10 bg-white/5 hover:border-blue-400/30 hover:bg-blue-500/5"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-white">{project.name}</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {project.description || "No description"}
+                  </p>
+                </button>
+              ))}
+            </div>
           </div>
 
           <nav className="flex-1 space-y-2 p-4">
@@ -667,8 +790,11 @@ const App = () => {
                   Intelligent Requirement Change Impact Analyzer
                 </p>
                 <h1 className="mt-1 text-2xl font-semibold text-white">
-                  Requirement Traceability & Change Control System
+                  {activeProject?.name || "Requirement Traceability & Change Control System"}
                 </h1>
+                <p className="mt-1 text-sm text-slate-400">
+                  {activeProject?.description || "Select or create a project to begin."}
+                </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">

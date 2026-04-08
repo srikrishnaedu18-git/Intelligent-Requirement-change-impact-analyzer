@@ -2,10 +2,14 @@ import mongoose from "mongoose";
 
 const requirementSchema = new mongoose.Schema(
   {
+    project: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      required: true
+    },
     reqId: {
       type: String,
       required: true,
-      unique: true,
       trim: true
     },
     title: {
@@ -37,6 +41,8 @@ const requirementSchema = new mongoose.Schema(
     timestamps: true
   }
 );
+
+requirementSchema.index({ project: 1, reqId: 1 }, { unique: true });
 
 const Requirement = mongoose.model("Requirement", requirementSchema);
 

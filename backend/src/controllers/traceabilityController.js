@@ -1,8 +1,10 @@
 import TraceabilityLink from "../models/TraceabilityLink.js";
 import { createAuditLog } from "../utils/audit.js";
+import { resolveProject } from "../utils/projectContext.js";
 
-export const getTraceabilityLinks = async (_req, res) => {
-  const links = await TraceabilityLink.find()
+export const getTraceabilityLinks = async (req, res) => {
+  const project = await resolveProject({ projectId: req.query.projectId });
+  const links = await TraceabilityLink.find({ project: project._id })
     .populate("requirement", "reqId title priority status")
     .sort({ createdAt: -1 });
 
@@ -10,9 +12,11 @@ export const getTraceabilityLinks = async (_req, res) => {
 };
 
 export const createTraceabilityLink = async (req, res) => {
-  const { requirement, codeModule, testCase, coverageStatus } = req.body;
+  const { projectId, requirement, codeModule, testCase, coverageStatus } = req.body;
+  const project = await resolveProject({ projectId });
 
   const link = await TraceabilityLink.create({
+    project: project._id,
     requirement,
     codeModule,
     testCase,
@@ -20,6 +24,7 @@ export const createTraceabilityLink = async (req, res) => {
   });
 
   await createAuditLog({
+    project: project._id,
     action: "LINK_CREATED",
     entityType: "TraceabilityLink",
     entityId: link._id.toString(),
@@ -52,6 +57,7 @@ export const updateTraceabilityLink = async (req, res) => {
   await link.save();
 
   await createAuditLog({
+    project: link.project,
     action: "LINK_UPDATED",
     entityType: "TraceabilityLink",
     entityId: link._id.toString(),
@@ -81,6 +87,7 @@ export const deleteTraceabilityLink = async (req, res) => {
   await TraceabilityLink.findByIdAndDelete(id);
 
   await createAuditLog({
+    project: link.project,
     action: "LINK_DELETED",
     entityType: "TraceabilityLink",
     entityId: link._id.toString(),

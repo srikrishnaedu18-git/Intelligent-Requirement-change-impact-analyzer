@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 
 const traceabilityLinkSchema = new mongoose.Schema(
   {
+    project: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      required: true
+    },
     requirement: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Requirement",

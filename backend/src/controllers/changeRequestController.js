@@ -2,6 +2,7 @@ import ChangeRequest from "../models/ChangeRequest.js";
 import Requirement from "../models/Requirement.js";
 import TraceabilityLink from "../models/TraceabilityLink.js";
 import { createAuditLog } from "../utils/audit.js";
+import { resolveProject } from "../utils/projectContext.js";
 
 const getRiskLevel = (score) => {
   if (score > 60) {
@@ -15,8 +16,9 @@ const getRiskLevel = (score) => {
   return "Standard";
 };
 
-export const getChangeRequests = async (_req, res) => {
-  const requests = await ChangeRequest.find()
+export const getChangeRequests = async (req, res) => {
+  const project = await resolveProject({ projectId: req.query.projectId });
+  const requests = await ChangeRequest.find({ project: project._id })
     .populate("requirement", "reqId title priority status")
     .sort({ createdAt: -1 });
 
@@ -48,7 +50,8 @@ export const analyzeImpact = async (req, res) => {
 };
 
 export const createChangeRequest = async (req, res) => {
-  const { requirement, description, proposedChange } = req.body;
+  const { projectId, requirement, description, proposedChange } = req.body;
+  const project = await resolveProject({ projectId });
 
   const existingRequirement = await Requirement.findById(requirement);
 
@@ -63,6 +66,7 @@ export const createChangeRequest = async (req, res) => {
     (existingRequirement.priority === "High" ? 15 : 0);
 
   const changeRequest = await ChangeRequest.create({
+    project: project._id,
     requirement,
     description,
     proposedChange,
@@ -71,6 +75,7 @@ export const createChangeRequest = async (req, res) => {
   });
 
   await createAuditLog({
+    project: project._id,
     action: "CR_CREATED",
     entityType: "ChangeRequest",
     entityId: changeRequest._id.toString(),
@@ -117,6 +122,7 @@ export const updateChangeRequest = async (req, res) => {
   await changeRequest.save();
 
   await createAuditLog({
+    project: changeRequest.project,
     action: "CR_UPDATED",
     entityType: "ChangeRequest",
     entityId: changeRequest._id.toString(),
@@ -146,6 +152,7 @@ export const deleteChangeRequest = async (req, res) => {
   await ChangeRequest.findByIdAndDelete(id);
 
   await createAuditLog({
+    project: changeRequest.project,
     action: "CR_DELETED",
     entityType: "ChangeRequest",
     entityId: changeRequest._id.toString(),

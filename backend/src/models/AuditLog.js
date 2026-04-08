@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 
 const auditLogSchema = new mongoose.Schema(
   {
+    project: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      required: true
+    },
     action: {
       type: String,
       required: true,

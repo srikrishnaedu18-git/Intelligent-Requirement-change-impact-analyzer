@@ -2,16 +2,22 @@ import Requirement from "../models/Requirement.js";
 import ChangeRequest from "../models/ChangeRequest.js";
 import TraceabilityLink from "../models/TraceabilityLink.js";
 import { createAuditLog } from "../utils/audit.js";
+import { resolveProject } from "../utils/projectContext.js";
 
-export const getRequirements = async (_req, res) => {
-  const requirements = await Requirement.find().sort({ createdAt: -1 });
+export const getRequirements = async (req, res) => {
+  const project = await resolveProject({ projectId: req.query.projectId });
+  const requirements = await Requirement.find({ project: project._id }).sort({
+    createdAt: -1
+  });
   res.json(requirements);
 };
 
 export const createRequirement = async (req, res) => {
-  const { reqId, title, description, priority, status, tags } = req.body;
+  const { projectId, reqId, title, description, priority, status, tags } = req.body;
+  const project = await resolveProject({ projectId });
 
   const requirement = await Requirement.create({
+    project: project._id,
     reqId,
     title,
     description,
@@ -21,6 +27,7 @@ export const createRequirement = async (req, res) => {
   });
 
   await createAuditLog({
+    project: project._id,
     action: "CREATE",
     entityType: "Requirement",
     entityId: requirement._id.toString(),
@@ -50,6 +57,7 @@ export const updateRequirement = async (req, res) => {
   await requirement.save();
 
   await createAuditLog({
+    project: requirement.project,
     action: "UPDATE",
     entityType: "Requirement",
     entityId: requirement._id.toString(),
@@ -75,6 +83,7 @@ export const deleteRequirement = async (req, res) => {
   ]);
 
   await createAuditLog({
+    project: requirement.project,
     action: "DELETE",
     entityType: "Requirement",
     entityId: requirement._id.toString(),
