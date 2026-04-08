@@ -190,6 +190,30 @@ const getRiskLevel = (score) => {
   return "Standard";
 };
 
+const syncProjectAwareIndexes = async () => {
+  const requirementCollection = Requirement.collection;
+
+  try {
+    const existingIndexes = await requirementCollection.indexes();
+    const hasLegacyReqIdIndex = existingIndexes.some(
+      (index) => index.name === "reqId_1"
+    );
+
+    if (hasLegacyReqIdIndex) {
+      await requirementCollection.dropIndex("reqId_1");
+      console.log("Dropped legacy reqId_1 index from requirements.");
+    }
+  } catch (error) {
+    console.warn("Could not inspect/drop legacy requirement indexes:", error.message);
+  }
+
+  await Requirement.syncIndexes();
+  await TraceabilityLink.syncIndexes();
+  await ChangeRequest.syncIndexes();
+  await AuditLog.syncIndexes();
+  await Project.syncIndexes();
+};
+
 const seedProjectWorkspace = async (projectSeed) => {
   const project = await Project.create({
     name: projectSeed.name,
@@ -282,6 +306,7 @@ const seedProjectWorkspace = async (projectSeed) => {
 
 const main = async () => {
   await connectDatabase();
+  await syncProjectAwareIndexes();
 
   await Promise.all([
     AuditLog.deleteMany({}),
