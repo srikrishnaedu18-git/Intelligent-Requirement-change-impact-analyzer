@@ -69,8 +69,15 @@ const initialForm = {
   title: "",
   description: "",
   priority: "Medium",
-  status: "Draft",
-  tags: ""
+  status: "Draft"
+};
+
+const initialRequirementDetailForm = {
+  reqId: "",
+  title: "",
+  description: "",
+  priority: "Medium",
+  status: "Draft"
 };
 
 const initialLinkForm = {
@@ -104,6 +111,7 @@ const App = () => {
   const [traceabilityLinks, setTraceabilityLinks] = useState([]);
   const [changeRequests, setChangeRequests] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [auditSearchTerm, setAuditSearchTerm] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [linksLoading, setLinksLoading] = useState(true);
@@ -128,6 +136,11 @@ const App = () => {
   const [editingRequirementId, setEditingRequirementId] = useState("");
   const [editingLinkId, setEditingLinkId] = useState("");
   const [editingChangeRequestId, setEditingChangeRequestId] = useState("");
+  const [selectedRequirement, setSelectedRequirement] = useState(null);
+  const [isRequirementModalEditing, setIsRequirementModalEditing] = useState(false);
+  const [requirementDetailForm, setRequirementDetailForm] = useState(
+    initialRequirementDetailForm
+  );
 
   const loadAuditLogs = async () => {
     const auditLogData = await getAuditLogs();
@@ -248,6 +261,22 @@ const App = () => {
     });
   }, [requirements, traceabilityLinks]);
 
+  const filteredAuditLogs = useMemo(() => {
+    const term = auditSearchTerm.trim().toLowerCase();
+
+    if (!term) {
+      return auditLogs;
+    }
+
+    return auditLogs.filter((log) => {
+      return (
+        log.action?.toLowerCase().includes(term) ||
+        log.entityType?.toLowerCase().includes(term) ||
+        log.details?.toLowerCase().includes(term)
+      );
+    });
+  }, [auditLogs, auditSearchTerm]);
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((current) => ({ ...current, [name]: value }));
@@ -272,10 +301,7 @@ const App = () => {
     try {
       const payload = {
         ...formData,
-        tags: formData.tags
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter(Boolean)
+        tags: []
       };
 
       if (editingRequirementId) {
@@ -410,8 +436,7 @@ const App = () => {
       title: requirement.title,
       description: requirement.description,
       priority: requirement.priority,
-      status: requirement.status,
-      tags: (requirement.tags || []).join(", ")
+      status: requirement.status
     });
     setErrorMessage("");
     setSuccessMessage("");
@@ -452,6 +477,65 @@ const App = () => {
       setErrorMessage(error.message);
     } finally {
       setDeletingId("");
+    }
+  };
+
+  const openRequirementDetails = (requirement) => {
+    setSelectedRequirement(requirement);
+    setRequirementDetailForm({
+      reqId: requirement.reqId,
+      title: requirement.title,
+      description: requirement.description,
+      priority: requirement.priority,
+      status: requirement.status
+    });
+    setIsRequirementModalEditing(false);
+  };
+
+  const closeRequirementDetails = () => {
+    setSelectedRequirement(null);
+    setIsRequirementModalEditing(false);
+    setRequirementDetailForm(initialRequirementDetailForm);
+  };
+
+  const handleRequirementDetailChange = (event) => {
+    const { name, value } = event.target;
+    setRequirementDetailForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleRequirementDetailSave = async () => {
+    if (!selectedRequirement) {
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      const updatedRequirement = await updateRequirement(selectedRequirement._id, {
+        ...requirementDetailForm,
+        tags: selectedRequirement.tags || []
+      });
+
+      setRequirements((current) =>
+        current.map((requirement) =>
+          requirement._id === updatedRequirement._id ? updatedRequirement : requirement
+        )
+      );
+      setSelectedRequirement(updatedRequirement);
+      setRequirementDetailForm({
+        reqId: updatedRequirement.reqId,
+        title: updatedRequirement.title,
+        description: updatedRequirement.description,
+        priority: updatedRequirement.priority,
+        status: updatedRequirement.status
+      });
+      setIsRequirementModalEditing(false);
+      await loadAuditLogs();
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -573,33 +657,6 @@ const App = () => {
               </a>
             ))}
           </nav>
-
-          <div className="border-t border-white/10 p-4">
-            <div className="space-y-3">
-              {moduleCards.map((module) => {
-                const Icon = module.icon;
-
-                return (
-                  <div
-                    key={module.title}
-                    className="rounded-2xl border border-white/10 bg-white/5 p-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-xl border border-white/10 bg-slate-900/80 p-2">
-                        <Icon className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-white">
-                          {module.title}
-                        </p>
-                        <p className="text-xs text-slate-400">{module.summary}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </aside>
 
         <div className="min-w-0 flex-1">
@@ -610,7 +667,7 @@ const App = () => {
                   Intelligent Requirement Change Impact Analyzer
                 </p>
                 <h1 className="mt-1 text-2xl font-semibold text-white">
-                  MERN SCM Dashboard
+                  Requirement Traceability & Change Control System
                 </h1>
               </div>
 
@@ -631,12 +688,9 @@ const App = () => {
           <div className="relative">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-3xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-blue-200">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Intelligent Requirement Change Impact Analyzer
-                </div>
                 <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-tight text-white lg:text-5xl">
-                  Software Configuration Management, reimagined as a live MERN dashboard
+                  Intelligent Requirement Change Impact Analyzer With Code-Issue
+                  Traceability Mapping
                 </h1>
                 <p className="mt-5 max-w-3xl text-base leading-7 text-slate-300">
                   Build, trace, analyze, and audit requirements in one unified workspace.
@@ -665,33 +719,6 @@ const App = () => {
             </div>
           </div>
         </header>
-
-        <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {moduleCards.map((module) => {
-            const Icon = module.icon;
-
-            return (
-              <article
-                key={module.title}
-                className={`rounded-3xl border bg-gradient-to-br p-5 ${module.tone}`}
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-lg font-semibold text-white">
-                      {module.title}
-                    </p>
-                    <p className="mt-2 text-sm text-slate-200">
-                      {module.summary}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <Icon className="h-5 w-5 text-white" />
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </section>
 
         <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Total Requirements" value={stats.total} />
@@ -836,14 +863,6 @@ const App = () => {
                 />
               </div>
 
-              <Field
-                label="Tags"
-                name="tags"
-                placeholder="security, login, access-control"
-                value={formData.tags}
-                onChange={handleChange}
-              />
-
               {errorMessage ? (
                 <p className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                   {errorMessage}
@@ -904,15 +923,6 @@ const App = () => {
             </div>
 
             <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
-              <div className="hidden grid-cols-[1fr_2fr_1fr_1fr_1.2fr_0.9fr] gap-4 bg-slate-900/80 px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 md:grid">
-                <span>Req ID</span>
-                <span>Title</span>
-                <span>Priority</span>
-                <span>Status</span>
-                <span>Tags</span>
-                <span>Actions</span>
-              </div>
-
               {loading ? (
                 <div className="px-5 py-8 text-sm text-slate-300">
                   Loading requirements...
@@ -923,88 +933,129 @@ const App = () => {
                   the form.
                 </div>
               ) : (
-                <div className="divide-y divide-white/10">
-                  {filteredRequirements.map((requirement) => (
-                    <div
-                      key={requirement._id}
-                      className="grid gap-3 px-5 py-4 md:grid-cols-[1fr_2fr_1fr_1fr_1.2fr_0.9fr] md:items-center"
-                    >
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 md:hidden">
-                          Req ID
-                        </p>
-                        <p className="font-medium text-blue-200">
-                          {requirement.reqId}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 md:hidden">
-                          Title
-                        </p>
-                        <p className="text-sm text-white">{requirement.title}</p>
-                        <p className="mt-1 text-sm text-slate-400">
-                          {requirement.description}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 md:hidden">
-                          Priority
-                        </p>
-                        <p className={`text-sm font-medium ${priorityStyles[requirement.priority]}`}>
-                          {requirement.priority}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 md:hidden">
-                          Status
-                        </p>
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[requirement.status]}`}
-                        >
-                          {requirement.status}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 md:hidden">
-                          Tags
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {(requirement.tags || []).length > 0 ? (
-                            requirement.tags.map((tag) => (
-                              <span
-                                key={tag}
-                                className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300"
+                <>
+                  <div className="hidden max-h-[31rem] overflow-y-auto overflow-x-hidden md:block">
+                    <table className="w-full table-fixed border-collapse">
+                      <thead className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur">
+                        <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                          <th className="whitespace-nowrap px-4 py-4 w-[15%]">Req ID</th>
+                          <th className="px-4 py-4 w-[38%]">Title</th>
+                          <th className="whitespace-nowrap px-4 py-4 pr-8 w-[14%]">Priority</th>
+                          <th className="whitespace-nowrap px-6 py-4 pl-8 w-[16%]">Status</th>
+                          <th className="whitespace-nowrap px-4 py-4 w-[17%]">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredRequirements.map((requirement) => (
+                          <tr key={requirement._id} className="align-middle">
+                            <td className="px-4 py-3 font-medium text-blue-200">
+                              {requirement.reqId}
+                            </td>
+                            <td className="px-4 py-3">
+                              <a
+                                href="#"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  openRequirementDetails(requirement);
+                                }}
+                                className="text-sm font-medium text-white transition hover:text-blue-300 hover:underline"
                               >
-                                {tag}
+                                {requirement.title}
+                              </a>
+                            </td>
+                            <td
+                              className={`px-4 py-3 pr-8 text-sm font-medium ${priorityStyles[requirement.priority]}`}
+                            >
+                              {requirement.priority}
+                            </td>
+                            <td className="px-6 py-3 pl-8">
+                              <span
+                                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[requirement.status]}`}
+                              >
+                                {requirement.status}
                               </span>
-                            ))
-                          ) : (
-                            <span className="text-sm text-slate-500">No tags</span>
-                          )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex gap-2">
+                                <ActionButton
+                                  icon={Trash2}
+                                  label={deletingId === requirement._id ? "Deleting..." : "Delete"}
+                                  onClick={() => handleRequirementDelete(requirement)}
+                                  tone="danger"
+                                  disabled={deletingId === requirement._id}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="divide-y divide-white/10 md:hidden">
+                    {filteredRequirements.map((requirement) => (
+                      <div key={requirement._id} className="space-y-3 px-5 py-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                            Req ID
+                          </p>
+                          <p className="mt-1 font-medium text-blue-200">
+                            {requirement.reqId}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                            Title
+                          </p>
+                          <a
+                            href="#"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              openRequirementDetails(requirement);
+                            }}
+                            className="mt-1 inline-block text-sm font-medium text-white transition hover:text-blue-300 hover:underline"
+                          >
+                            {requirement.title}
+                          </a>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                              Priority
+                            </p>
+                            <p className={`mt-1 text-sm font-medium ${priorityStyles[requirement.priority]}`}>
+                              {requirement.priority}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                              Status
+                            </p>
+                            <span
+                              className={`mt-1 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[requirement.status]}`}
+                            >
+                              {requirement.status}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                            Actions
+                          </p>
+                          <div className="mt-2 flex gap-2">
+                            <ActionButton
+                              icon={Trash2}
+                              label={deletingId === requirement._id ? "Deleting..." : "Delete"}
+                              onClick={() => handleRequirementDelete(requirement)}
+                              tone="danger"
+                              disabled={deletingId === requirement._id}
+                            />
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 md:hidden">
-                          Actions
-                        </p>
-                        <div className="flex gap-2">
-                          <ActionButton
-                            icon={Pencil}
-                            label="Edit"
-                            onClick={() => startRequirementEdit(requirement)}
-                          />
-                          <ActionButton
-                            icon={Trash2}
-                            label={deletingId === requirement._id ? "Deleting..." : "Delete"}
-                            onClick={() => handleRequirementDelete(requirement)}
-                            tone="danger"
-                            disabled={deletingId === requirement._id}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </section>
@@ -1085,39 +1136,41 @@ const App = () => {
               </div>
             </form>
 
-            <div className="mt-8 space-y-3 border-t border-white/10 pt-6">
+            <div className="mt-8 border-t border-white/10 pt-6">
               <p className="text-sm font-semibold text-white">Manage Existing Links</p>
-              {traceabilityLinks.slice(0, 6).map((link) => (
-                <div
-                  key={link._id}
-                  className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"
-                >
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-emerald-200">
-                        {link.requirement?.reqId} - {link.codeModule}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-400">
-                        Test case: {link.testCase}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <ActionButton
-                        icon={Pencil}
-                        label="Edit"
-                        onClick={() => startLinkEdit(link)}
-                      />
-                      <ActionButton
-                        icon={Trash2}
-                        label={deletingId === link._id ? "Deleting..." : "Delete"}
-                        onClick={() => handleLinkDelete(link)}
-                        tone="danger"
-                        disabled={deletingId === link._id}
-                      />
+              <div className="mt-3 max-h-[19rem] space-y-3 overflow-y-auto pr-1">
+                {traceabilityLinks.map((link) => (
+                  <div
+                    key={link._id}
+                    className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"
+                  >
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-200">
+                          {link.requirement?.reqId} - {link.codeModule}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-400">
+                          Test case: {link.testCase}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <ActionButton
+                          icon={Pencil}
+                          label="Edit"
+                          onClick={() => startLinkEdit(link)}
+                        />
+                        <ActionButton
+                          icon={Trash2}
+                          label={deletingId === link._id ? "Deleting..." : "Delete"}
+                          onClick={() => handleLinkDelete(link)}
+                          tone="danger"
+                          disabled={deletingId === link._id}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </section>
 
@@ -1404,47 +1457,204 @@ const App = () => {
                 start the journal.
               </div>
             ) : (
-              <div className="space-y-4">
-                {auditLogs.map((log) => (
-                  <article
-                    key={log._id}
-                    className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/50 p-5 md:grid-cols-[0.9fr_1.2fr_2fr]"
-                  >
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                        Timestamp
-                      </p>
-                      <p className="mt-2 text-sm text-slate-200">
-                        {formatTimestamp(log.timestamp)}
-                      </p>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                <div className="mb-4">
+                  <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-slate-300">
+                    <Search className="h-4 w-4 text-slate-400" />
+                    <input
+                      value={auditSearchTerm}
+                      onChange={(event) => setAuditSearchTerm(event.target.value)}
+                      placeholder="Search action, entity, or details"
+                      className="w-full border-none bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+                    />
+                  </label>
+                </div>
+
+                <div className="max-h-[34rem] space-y-4 overflow-y-auto pr-1">
+                  {filteredAuditLogs.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/50 px-5 py-8 text-sm text-slate-400">
+                      No audit entries match your search.
                     </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                        Action
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <span className="inline-flex rounded-full bg-violet-600/20 px-3 py-1 text-xs font-semibold text-violet-200">
-                          {log.action}
-                        </span>
-                        <span className="inline-flex rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
-                          {log.entityType}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                        Details
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-slate-300">
-                        {log.details || `Entity ID: ${log.entityId}`}
-                      </p>
-                    </div>
-                  </article>
-                ))}
+                  ) : (
+                    filteredAuditLogs.map((log) => (
+                      <article
+                        key={log._id}
+                        className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/50 p-5 md:grid-cols-[0.9fr_1.2fr_2fr]"
+                      >
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                            Timestamp
+                          </p>
+                          <p className="mt-2 text-sm text-slate-200">
+                            {formatTimestamp(log.timestamp)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                            Action
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="inline-flex rounded-full bg-violet-600/20 px-3 py-1 text-xs font-semibold text-violet-200">
+                              {log.action}
+                            </span>
+                            <span className="inline-flex rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
+                              {log.entityType}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                            Details
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-slate-300">
+                            {log.details || `Entity ID: ${log.entityId}`}
+                          </p>
+                        </div>
+                      </article>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>
         </section>
+
+        {selectedRequirement ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-2xl rounded-[2rem] border border-white/10 bg-slate-900 p-6 shadow-2xl shadow-black/40">
+              <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-5">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                    Requirement Details
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold text-white">
+                    {isRequirementModalEditing
+                      ? `Edit ${selectedRequirement.reqId}`
+                      : `${selectedRequirement.reqId} - ${selectedRequirement.title}`}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeRequirementDetails}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+                >
+                  Close
+                </button>
+              </div>
+
+              {isRequirementModalEditing ? (
+                <div className="mt-6 space-y-4">
+                  <Field
+                    label="Requirement ID"
+                    name="reqId"
+                    placeholder="REQ-001"
+                    value={requirementDetailForm.reqId}
+                    onChange={handleRequirementDetailChange}
+                  />
+                  <Field
+                    label="Title"
+                    name="title"
+                    placeholder="Requirement title"
+                    value={requirementDetailForm.title}
+                    onChange={handleRequirementDetailChange}
+                  />
+                  <TextAreaField
+                    label="Description"
+                    name="description"
+                    placeholder="Requirement description"
+                    value={requirementDetailForm.description}
+                    onChange={handleRequirementDetailChange}
+                  />
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <SelectField
+                      label="Priority"
+                      name="priority"
+                      value={requirementDetailForm.priority}
+                      onChange={handleRequirementDetailChange}
+                      options={["Low", "Medium", "High"]}
+                    />
+                    <SelectField
+                      label="Status"
+                      name="status"
+                      value={requirementDetailForm.status}
+                      onChange={handleRequirementDetailChange}
+                      options={["Draft", "Approved", "Implemented"]}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-6 grid gap-5 md:grid-cols-2">
+                    <DetailCard
+                      label="Priority"
+                      value={selectedRequirement.priority}
+                    />
+                    <DetailCard
+                      label="Status"
+                      value={selectedRequirement.status}
+                    />
+                    <DetailCard
+                      label="Requirement ID"
+                      value={selectedRequirement.reqId}
+                    />
+                    <DetailCard
+                      label="Created"
+                      value={formatTimestamp(selectedRequirement.createdAt)}
+                    />
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/40 p-5">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                      Description
+                    </p>
+                    <p className="mt-3 text-sm leading-7 text-slate-200">
+                      {selectedRequirement.description}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              <div className="mt-6 flex justify-end gap-3 border-t border-white/10 pt-5">
+                {isRequirementModalEditing ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRequirementModalEditing(false);
+                        setRequirementDetailForm({
+                          reqId: selectedRequirement.reqId,
+                          title: selectedRequirement.title,
+                          description: selectedRequirement.description,
+                          priority: selectedRequirement.priority,
+                          status: selectedRequirement.status
+                        });
+                      }}
+                      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRequirementDetailSave}
+                      disabled={submitting}
+                      className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {submitting ? "Saving..." : "Save Changes"}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsRequirementModalEditing(true)}
+                    className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
+                  >
+                    Edit Requirement
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
           </div>
         </div>
       </div>
@@ -1590,6 +1800,13 @@ const MiniStat = ({ label, value, tone }) => (
   <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
     <p className="text-sm text-slate-400">{label}</p>
     <p className={`mt-2 text-lg font-semibold ${tone}`}>{value}</p>
+  </div>
+);
+
+const DetailCard = ({ label, value }) => (
+  <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+    <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
+    <p className="mt-2 text-sm leading-6 text-slate-100">{value}</p>
   </div>
 );
 
