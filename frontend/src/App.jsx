@@ -806,12 +806,6 @@ const App = () => {
                   {activeProject?.description || "Select or create a project to begin."}
                 </p>
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                <TopBarPill label="Requirements" value={stats.total} tone="blue" />
-                <TopBarPill label="Coverage" value={`${dashboardMetrics.coveragePercent}%`} tone="emerald" />
-                <TopBarPill label="Audit Entries" value={auditLogs.length} tone="violet" />
-              </div>
             </div>
           </div>
 
